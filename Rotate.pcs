@@ -1,0 +1,69 @@
+#encode<shift-jis>
+#import<System.dll>
+#import<System.Windows.Forms.dll>
+#import<System.Drawing.dll> // 画像を扱うために参照を追加する
+
+
+using System;
+using System.Drawing;
+
+object Run( params object[] args )
+{
+    // アクティブな画像を取得する
+    Mist.MistArray image = DataManager.Active;
+
+    if( image == null )
+    {
+        // アクティブな画像が存在しない場合は終了する
+        return( null );
+    }
+    //210526_PI_5min_16bit-6.nii.gz(0,0,-1)(-0.707,-0.707,0)
+	//210518_PI_5min (0,0,-1)(0.707,-0.707,0)
+	//Image8
+    Pluto.Vector3 cdir = new Pluto.Vector3(0,0,-1);
+	Pluto.Vector3 cup = new Pluto.Vector3(0,-1,0);//0.707,-0.707,0//0,-1,0
+	Pluto.Box box = image.Table[ "BOUNDINGBOX" ] as Pluto.Box;
+    Pluto.Vector3 cpos = box.Center;
+	cpos.Z = cpos.Z +300;
+	cpos.Y = cpos.Y -200;
+	//IPluto.Update( cpos, cdir, cup );
+    // バウンディングボックスの中心を回転中心にする
+     int theta_step = 2;
+    Pluto.Vector3 p0 = box.Center;
+	p0.Z = p0.Z +box.Depth/2;
+	
+    // 回転中心を基準として，外周を1回転させる
+    for( int theta = 0; theta <= 360 ; theta += theta_step )
+    {
+        // 任意軸周りのクォータニオンを生成する（回転角度は度数表記）
+        Pluto.Quaternion qua = new Pluto.Quaternion( cup, theta );
+
+        // 任意軸周りのクォータニオンを使って新しいカメラ位置を計算する
+        Pluto.Vector3 dir = qua.Rotate( p0 - cpos );
+        Pluto.Vector3 pos = p0 - dir;
+
+        // 視線方向ベクトルを正規化する
+        dir.Normalize( );
+
+        // カメラ位置と姿勢をに更新し，ビューの再描画を行う
+        IPluto.Update( pos, dir, cup );
+
+        // ビューの更新を待つために，デフォルトのイベントを処理する
+        System.Windows.Forms.Application.DoEvents( );
+        System.Threading.Thread.Sleep( 100 );
+
+        // キャプチャプラグインを呼び出してビューのキャプチャを行う
+        Image img = PluginManager.Run( "ViewCapture", false ) as Image;
+
+        if( img != null )
+        {
+            // キャプチャに成功した場合はファイルに保存する
+            // 保存先は絶対パスで指定すらことをお勧めします
+            //img.Save( "C:\\Users\\tmatsu\\Desktop\\old_method\\portal_data\\ACC_g161h\\portal\\pictures\\ACC_g161h" + theta.ToString( "000" ) + ".png" );
+            img.Save("\\\\taka2new\\dataT0\\Free\\chwang\\Moonshot\\3D\\" + theta.ToString( "000" ) + ".png");
+            // 不要なオブジェクトのメモリを開放する
+            img.Dispose( );
+        }
+    }
+    return( null );
+}
